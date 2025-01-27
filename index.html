@@ -42,6 +42,13 @@
             color: #666;
         }
 
+        .round-info {
+            font-size: 16px;
+            color: #2563EB;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
         .timer {
             font-size: 24px;
             font-weight: bold;
@@ -170,16 +177,22 @@
         .incorrect {
             color: #DC2626;
         }
+
+        .emoji {
+            font-size: 72px;
+        }
     </style>
 </head>
 <body>
     <div class="game-container">
         <div class="header">
-            <div class="progress">Question <span id="current">1</span> of <span id="total">10</span></div>
+            <div class="progress">Question <span id="current">1</span> of <span id="total">28</span></div>
             <div class="timer" id="timer">0:00</div>
         </div>
+        <div class="round-info" id="roundInfo">Round 1</div>
 
         <div class="main-content">
+            <div id="emoji" class="emoji"></div>
             <button id="soundBtn" class="sound-btn">🔊</button>
             
             <div class="answer-display" id="answerDisplay">
@@ -236,15 +249,18 @@
         ];
 
         let currentWord = null;
-        let currentIndex = 0;
+        let currentRound = 1;
+        let remainingWords = [];
+        let selectedLetters = [];
         let startTime = null;
         let timerInterval = null;
-        let selectedLetters = [];
 
         const elements = {
             current: document.getElementById('current'),
             total: document.getElementById('total'),
             timer: document.getElementById('timer'),
+            roundInfo: document.getElementById('roundInfo'),
+            emoji: document.getElementById('emoji'),
             soundBtn: document.getElementById('soundBtn'),
             answerDisplay: document.getElementById('answerDisplay'),
             lettersGrid: document.getElementById('lettersGrid'),
@@ -253,15 +269,18 @@
             message: document.getElementById('message')
         };
 
-        // 初始化遊戲
-        function initGame() {
-            elements.total.textContent = words.length;
-            startTime = Date.now();
-            startTimer();
-            pickNewWord();
+        function shuffleNewRound() {
+            remainingWords = [...words];
+            for (let i = remainingWords.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [remainingWords[i], remainingWords[j]] = [remainingWords[j], remainingWords[i]];
+            }
         }
 
-        // 計時器
+        function updateRoundInfo() {
+            elements.roundInfo.textContent = `Round ${currentRound} - ${words.length - remainingWords.length}/${words.length} completed`;
+        }
+
         function startTimer() {
             timerInterval = setInterval(() => {
                 const elapsed = Math.floor((Date.now() - startTime) / 1000);
@@ -290,7 +309,6 @@
 
         function createLetterButtons(word) {
             elements.lettersGrid.innerHTML = '';
-            // 創建打亂的字母按鈕
             const letters = word.split('');
             const shuffledLetters = shuffleArray([...letters]);
             
@@ -319,13 +337,16 @@
         }
 
         function pickNewWord() {
-            if (currentIndex >= words.length) {
-                endGame();
-                return;
+            if (remainingWords.length === 0) {
+                currentRound++;
+                shuffleNewRound();
+                alert(`Congratulations! Starting Round ${currentRound}`);
             }
 
-            currentWord = words[currentIndex];
-            elements.current.textContent = currentIndex + 1;
+            currentWord = remainingWords.pop();
+            elements.emoji.textContent = currentWord.emoji;
+            elements.current.textContent = words.length - remainingWords.length;
+            updateRoundInfo();
             selectedLetters = [];
             createLetterSlots(currentWord.en);
             createLetterButtons(currentWord.en);
@@ -337,10 +358,14 @@
             const userAnswer = Array.from(slots).map(slot => slot.textContent).join('').toLowerCase();
             
             if (userAnswer === currentWord.en) {
+                playSound(currentWord.en);
                 elements.message.textContent = 'Correct! ⭐';
                 elements.message.className = 'message correct';
-                currentIndex++;
-                setTimeout(pickNewWord, 1000);
+                elements.emoji.classList.add('bounce');
+                setTimeout(() => {
+                    elements.emoji.classList.remove('bounce');
+                    pickNewWord();
+                }, 1000);
             } else {
                 elements.message.textContent = 'Try again!';
                 elements.message.className = 'message incorrect';
@@ -354,28 +379,27 @@
             selectedLetters = [];
         }
 
-        function playSound() {
-            const utterance = new SpeechSynthesisUtterance(currentWord.en);
+        function playSound(word) {
+            const utterance = new SpeechSynthesisUtterance(word);
             utterance.lang = 'en-US';
             utterance.rate = 0.8;
             window.speechSynthesis.speak(utterance);
         }
 
-        function endGame() {
-            clearInterval(timerInterval);
-            elements.message.textContent = 'Game Complete! 🎉';
-            elements.message.className = 'message correct';
-            elements.submitBtn.disabled = true;
-            elements.clearBtn.disabled = true;
-            elements.soundBtn.disabled = true;
-        }
-
         // 事件監聽器
         elements.submitBtn.addEventListener('click', checkAnswer);
         elements.clearBtn.addEventListener('click', clearAnswer);
-        elements.soundBtn.addEventListener('click', playSound);
+        elements.soundBtn.addEventListener('click', () => playSound(currentWord.en));
 
-        // 開始遊戲
+        // 初始化遊戲
+        function initGame() {
+            elements.total.textContent = words.length;
+            startTime = Date.now();
+            startTimer();
+            shuffleNewRound();
+            pickNewWord();
+        }
+
         initGame();
     </script>
 </body>
